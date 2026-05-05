@@ -2,7 +2,7 @@ import io
 import json
 import re
 import pdfplumber
-from openai import OpenAI
+from groq import Groq
 from models import AnalyzeResponse
 
 
@@ -29,7 +29,7 @@ Analyze the resume against the job description and respond with ONLY valid JSON 
 }}"""
 
 
-def parse_openai_response(raw: str) -> AnalyzeResponse:
+def parse_groq_response(raw: str) -> AnalyzeResponse:
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     if not match:
         raise ValueError(f"No JSON object found in response: {raw!r}")
@@ -37,7 +37,7 @@ def parse_openai_response(raw: str) -> AnalyzeResponse:
         data = json.loads(match.group(0))
         return AnalyzeResponse(**data)
     except (json.JSONDecodeError, Exception) as exc:
-        raise ValueError(f"Failed to parse OpenAI response: {raw!r}") from exc
+        raise ValueError(f"Failed to parse Groq response: {raw!r}") from exc
 
 
 def analyze_resume(
@@ -46,19 +46,19 @@ def analyze_resume(
     client=None,
 ) -> AnalyzeResponse:
     if client is None:
-        client = OpenAI()
+        client = Groq()
     resume_text = extract_text_from_pdf(pdf_bytes)
     if not resume_text.strip():
         raise ValueError("No extractable text found in the PDF. It may be image-based or encrypted.")
     prompt = build_prompt(resume_text, job_description)
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
     )
 
     raw = response.choices[0].message.content
     if raw is None:
-        raise ValueError("OpenAI returned an empty response (possible content refusal)")
-    return parse_openai_response(raw)
+        raise ValueError("Groq returned an empty response (possible content refusal)")
+    return parse_groq_response(raw)

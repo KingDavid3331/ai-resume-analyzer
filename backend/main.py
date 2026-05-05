@@ -11,7 +11,7 @@ app = FastAPI(title="AI Resume Analyzer")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
     allow_methods=["POST"],
     allow_headers=["*"],
 )
