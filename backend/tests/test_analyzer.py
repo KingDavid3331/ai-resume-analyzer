@@ -43,3 +43,35 @@ def test_parse_openai_response_handles_trailing_text():
     raw = '```json\n{"score": 55, "missing_keywords": ["Go"], "suggestions": ["Learn Go"]}\n```\nHere is my analysis.'
     result = parse_openai_response(raw)
     assert result.score == 55
+
+
+from fastapi.testclient import TestClient
+from main import app
+
+
+def test_analyze_endpoint_returns_422_without_file():
+    client = TestClient(app)
+    response = client.post("/analyze", data={"job_description": "Python developer"})
+    assert response.status_code == 422  # FastAPI validation error
+
+
+def test_analyze_endpoint_returns_200_with_mock(tmp_path):
+    import io
+    from unittest.mock import patch
+    from models import AnalyzeResponse
+
+    mock_result = AnalyzeResponse(score=80, missing_keywords=["Docker"], suggestions=["Add Docker"])
+
+    with patch("main.analyze_resume", return_value=mock_result):
+        client = TestClient(app)
+        fake_pdf = io.BytesIO(b"fake pdf content")
+        response = client.post(
+            "/analyze",
+            files={"resume": ("test.pdf", fake_pdf, "application/pdf")},
+            data={"job_description": "Python developer needing Docker"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["score"] == 80
+    assert "Docker" in body["missing_keywords"]
