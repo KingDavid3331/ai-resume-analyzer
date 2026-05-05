@@ -37,3 +37,9 @@ def test_parse_openai_response_extracts_json_from_markdown():
     raw = '```json\n{"score": 60, "missing_keywords": ["Kubernetes"], "suggestions": ["Add K8s"]}\n```'
     result = parse_openai_response(raw)
     assert result.score == 60
+
+
+def test_parse_openai_response_handles_trailing_text():
+    raw = '```json\n{"score": 55, "missing_keywords": ["Go"], "suggestions": ["Learn Go"]}\n```\nHere is my analysis.'
+    result = parse_openai_response(raw)
+    assert result.score == 55

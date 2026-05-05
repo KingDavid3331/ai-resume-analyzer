@@ -30,15 +30,26 @@ Analyze the resume against the job description and respond with ONLY valid JSON 
 
 
 def parse_openai_response(raw: str) -> AnalyzeResponse:
-    # Strip markdown code fences if present
-    clean = re.sub(r"```(?:json)?\n?", "", raw).strip()
-    data = json.loads(clean)
-    return AnalyzeResponse(**data)
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise ValueError(f"No JSON object found in response: {raw!r}")
+    try:
+        data = json.loads(match.group(0))
+        return AnalyzeResponse(**data)
+    except (json.JSONDecodeError, Exception) as exc:
+        raise ValueError(f"Failed to parse OpenAI response: {raw!r}") from exc
 
 
-def analyze_resume(pdf_bytes: bytes, job_description: str) -> AnalyzeResponse:
-    client = OpenAI()
+def analyze_resume(
+    pdf_bytes: bytes,
+    job_description: str,
+    client=None,
+) -> AnalyzeResponse:
+    if client is None:
+        client = OpenAI()
     resume_text = extract_text_from_pdf(pdf_bytes)
+    if not resume_text.strip():
+        raise ValueError("No extractable text found in the PDF. It may be image-based or encrypted.")
     prompt = build_prompt(resume_text, job_description)
 
     response = client.chat.completions.create(
@@ -48,4 +59,6 @@ def analyze_resume(pdf_bytes: bytes, job_description: str) -> AnalyzeResponse:
     )
 
     raw = response.choices[0].message.content
+    if raw is None:
+        raise ValueError("OpenAI returned an empty response (possible content refusal)")
     return parse_openai_response(raw)
